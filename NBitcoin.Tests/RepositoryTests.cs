@@ -529,7 +529,7 @@ namespace NBitcoin.Tests
                 blocks.Add(b);
             }
 
-            var client = new RPCClient(new NetworkCredential("rpcuser", "rpcpassword"), new Uri("http://127.0.0.1:5000"), Network.StratisMain);
+            var client = new RPCClient(new NetworkCredential("rpcuser", "rpcpassword"), new Uri("http://127.0.0.1:5000"), Network.Main);
             Dictionary<int, string> blocksNotFound = new Dictionary<int, string>();
             var index = 0;
             while (index <= 9000)
@@ -553,7 +553,7 @@ namespace NBitcoin.Tests
         public void EnumerateStratisBlockcahinAndValidateAllBlocks()
         {
             var listAll = new Dictionary<string, StoredBlock>();
-            var store = new BlockStore(@"C:\StratisData", Network.StratisMain);
+            var store = new BlockStore(@"C:\StratisData", Network.Main);
             foreach (var block in store.EnumerateFolder())
             {
                 var hash = block.Item.GetHash();
@@ -565,7 +565,7 @@ namespace NBitcoin.Tests
 
             // walk the chain and check that all block are loaded correctly 
             var block100K = uint256.Parse("af380a53467b70bc5d1ee61441586398a0a5907bb4fad7855442575483effa54");
-            var genesis = Network.StratisMain.GetGenesis().GetHash();
+            var genesis = Network.Main.GetGenesis().GetHash();
             uint256 current = block100K;
             while (true)
             {
@@ -581,7 +581,7 @@ namespace NBitcoin.Tests
         [Trait("UnitTest", "UnitTest")]
         public void EnumerateStratisBlockcahinCheckTipBlock()
         {
-            var store = new BlockStore(@"C:\StratisData", Network.StratisMain);
+            var store = new BlockStore(@"C:\StratisData", Network.Main);
 
             // use the synchronize chain method to load all blocks and look for the tip (currently block 100k)
             var block100K = uint256.Parse("af380a53467b70bc5d1ee61441586398a0a5907bb4fad7855442575483effa54");
