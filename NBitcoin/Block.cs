@@ -56,6 +56,18 @@ namespace NBitcoin
 		uint256 hashMerkleRoot;
 
 		uint nTime;
+		public uint Time
+		{
+			get
+			{
+				return nTime;
+			}
+			set
+			{
+				nTime = value;
+			}
+		}
+
 		uint nBits;
 
 		public Target Bits
@@ -158,8 +170,6 @@ namespace NBitcoin
         {
             return HashX13.Instance.Hash(this.ToBytes());
         }
-
-       
 
         public DateTimeOffset BlockTime
 		{
@@ -432,7 +442,7 @@ namespace NBitcoin
         public bool CheckProofOfStake()
         {
             // todo: move this to the full node code.
-            // this code is temporary and will move to the full nide implementation when its ready
+            // this code is temporary and will move to the full node implementation when its ready
             if (IsProofOfWork())
                 return true;
 

@@ -272,7 +272,12 @@ namespace NBitcoin
 			}
 		}
 
-        int _LastPOWBlock;
+		public BigInteger ProofOfStakeLimit { get; set; }
+
+		public BigInteger ProofOfStakeLimitV2 { get; set; }
+
+
+		int _LastPOWBlock;
         public int LastPOWBlock
         {
             get
@@ -552,7 +557,7 @@ namespace NBitcoin
             consensus.BuriedDeployments[BuriedDeployments.BIP65] = 388381;
             consensus.BuriedDeployments[BuriedDeployments.BIP66] = 363725;
             consensus.BIP34Hash = new uint256("0x000000000000024b89b42a942fe0d9fea3bb44ab7bd1b19115dd6a759c0808b8");
-            consensus.PowLimit = new Target(new uint256("00000000ffffffffffffffffffffffffffffffffffffffffffffffffffffffff"));
+            consensus.PowLimit = new Target(new uint256("00000fffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"));
             consensus.SegWitHeight = 2000000000;
             consensus.PowTargetTimespan = TimeSpan.FromSeconds(14 * 24 * 60 * 60); // two weeks
             consensus.PowTargetSpacing = TimeSpan.FromSeconds(10 * 60);
@@ -566,10 +571,14 @@ namespace NBitcoin
             consensus.BIP9Deployments[BIP9Deployments.Segwit] = new BIP9DeploymentsParameters(1, 0, 0);
 
             consensus.LastPOWBlock = 12500;
-            // The message start string is designed to be unlikely to occur in normal data.
-            // The characters are rarely used upper ASCII, not valid as UTF-8, and produce
-            // a large 4-byte int at any alignment.
-            var pchMessageStart = new byte[4];
+
+			this.consensus.ProofOfStakeLimit =   new BigInteger(uint256.Parse("00000fffffffffffffffffffffffffffffffffffffffffffffffffffffffffff").ToBytes());
+			this.consensus.ProofOfStakeLimitV2 = new BigInteger(uint256.Parse("000000000000ffffffffffffffffffffffffffffffffffffffffffffffffffff").ToBytes()); ;
+
+			// The message start string is designed to be unlikely to occur in normal data.
+			// The characters are rarely used upper ASCII, not valid as UTF-8, and produce
+			// a large 4-byte int at any alignment.
+			var pchMessageStart = new byte[4];
             pchMessageStart[0] = 0x70;
             pchMessageStart[1] = 0x35;
             pchMessageStart[2] = 0x22;

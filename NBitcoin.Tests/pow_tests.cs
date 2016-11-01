@@ -9,6 +9,8 @@ using Xunit;
 
 namespace NBitcoin.Tests
 {
+	using NBitcoin.BitcoinCore;
+
 	public class pow_tests
 	{
 
@@ -16,15 +18,16 @@ namespace NBitcoin.Tests
 		[Trait("UnitTest", "UnitTest")]
 		public static void CanCalculatePowCorrectly()
 		{
-			ConcurrentChain chain = new ConcurrentChain(Network.Main);
-			EnsureDownloaded("MainChain.dat", "https://aois.blob.core.windows.net/public/MainChain.dat");
-			chain.Load(File.ReadAllBytes("MainChain.dat"));
+			var store = new BlockStore(@"C:\StratisData", Network.Main);
+			ConcurrentChain chain = store.GetChain();
+			//EnsureDownloaded("main.headers.dat", "https://bytyng.bn1302.livefilestore.com/y3miHC-eZsNz89GuLViA3-8dTT5BmYBgq6H1VdmtDAhv0XQpaWoBh85lPDEswbgP_kqLXKLJSIGrO1SpyzFszbmXqL5EhcwcYKf6WM9St9Z_wOIx38sC4NfEQKjI8QzwNdr5sNnyI_OxVHWiee14-H5rw/main.headers.dat?download&psid=1");
+			//chain.Load(File.ReadAllBytes("main.headers.dat"));
 			foreach(var block in chain.EnumerateAfter(chain.Genesis))
 			{
 				var thisWork = block.GetWorkRequired(Network.Main);
 				var thisWork2 = block.Previous.GetNextWorkRequired(Network.Main);
 				Assert.Equal(thisWork, thisWork2);
-				Assert.True(block.CheckProofOfWorkAndTarget(Network.Main));
+				Assert.True(block.CheckPowPosAndTarget(Network.Main));
 			}
 		}
 

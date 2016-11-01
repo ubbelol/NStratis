@@ -6,6 +6,32 @@ using System.Threading.Tasks;
 
 namespace NBitcoin
 {
+	using NBitcoin.BouncyCastle.Math;
+
+	[Flags]
+	public enum BlockFlag //block index flags
+
+	{
+		BLOCK_PROOF_OF_STAKE = (1 << 0), // is proof-of-stake block
+		BLOCK_STAKE_ENTROPY  = (1 << 1), // entropy bit for stake modifier
+		BLOCK_STAKE_MODIFIER = (1 << 2), // regenerated stake modifier
+	};
+
+	public class PosHeader
+	{
+		public int Mint;
+
+		public OutPoint PrevoutStake;
+
+		public uint StakeTime;
+
+		public uint StakeModifier; // hash modifier for proof-of-stake
+
+		public uint256 StakeModifierV2;
+
+		public BlockFlag Flags { get; set; }
+	}
+
 	/// <summary>
 	/// A BlockHeader chained with all its ancestors
 	/// </summary>
@@ -56,7 +82,19 @@ namespace NBitcoin
 			}
 		}
 
+		PosHeader posHeader;
+
+		public PosHeader PosHeader
+		{
+			get
+			{
+				return posHeader;
+			}
+		}
+
+
 		System.Numerics.BigInteger _ChainWork;
+
 		public uint256 ChainWork
 		{
 			get
@@ -67,9 +105,10 @@ namespace NBitcoin
 
 		public ChainedBlock(BlockHeader header, uint256 headerHash, ChainedBlock previous)
 		{
-			if(header == null)
+			if (header == null)
 				throw new ArgumentNullException("header");
-			if(previous != null)
+
+			if (previous != null)
 			{
 				nHeight = previous.Height + 1;
 			}
@@ -78,17 +117,31 @@ namespace NBitcoin
 			this.header = header;
 			this.phashBlock = headerHash ?? header.GetHash();
 
-			if(previous == null)
+			if (previous == null)
 			{
-				if(header.HashPrevBlock != uint256.Zero)
+				if (header.HashPrevBlock != uint256.Zero)
 					throw new ArgumentException("Only the genesis block can have no previous block");
 			}
 			else
 			{
-				if(previous.HashBlock != header.HashPrevBlock)
+				if (previous.HashBlock != header.HashPrevBlock)
 					throw new ArgumentException("The previous block has not the expected hash");
 			}
+
 			CalculateChainWork();
+		}
+
+		public ChainedBlock(Block block, uint256 headerHash, ChainedBlock previous)
+			: this(block.Header, headerHash, previous)
+		{
+			this.posHeader = new PosHeader();
+
+			if (block.IsProofOfStake())
+			{
+				this.SetProofOfStake();
+				this.posHeader.PrevoutStake = block.Transactions[1].Inputs[0].PrevOut;
+				this.posHeader.StakeTime = block.Transactions[1].Time;
+			}
 		}
 
 		private void CalculateChainWork()
@@ -97,11 +150,11 @@ namespace NBitcoin
 		}
 
 		static System.Numerics.BigInteger Pow256 = System.Numerics.BigInteger.Pow(2, 256);
+
 		private System.Numerics.BigInteger GetBlockProof()
 		{
 			var bnTarget = Header.Bits.ToBigInteger();
-			if(bnTarget <= System.Numerics.BigInteger.Zero || bnTarget >= Pow256)
-				return System.Numerics.BigInteger.Zero;
+			if (bnTarget <= System.Numerics.BigInteger.Zero || bnTarget >= Pow256) return System.Numerics.BigInteger.Zero;
 			// We need to compute 2**256 / (bnTarget+1), but we can't represent 2**256
 			// as it's too large for a arith_uint256. However, as 2**256 is at least as large
 			// as bnTarget+1, it is equal to ((2**256 - bnTarget - 1) / (bnTarget+1)) + 1,
@@ -111,8 +164,9 @@ namespace NBitcoin
 
 		public ChainedBlock(BlockHeader header, int height)
 		{
-			if(header == null)
+			if (header == null)
 				throw new ArgumentNullException("header");
+
 			nHeight = height;
 			//this.nDataPos = pos;
 			this.header = header;
@@ -126,17 +180,19 @@ namespace NBitcoin
 			List<uint256> vHave = new List<uint256>();
 
 			var pindex = this;
-			while(pindex != null)
+			while (pindex != null)
 			{
 				vHave.Add(pindex.HashBlock);
+				
 				// Stop when we have added the genesis block.
-				if(pindex.Height == 0)
+				if (pindex.Height == 0)
 					break;
+
 				// Exponentially larger steps back, plus the genesis block.
 				int nHeight = Math.Max(pindex.Height - nStep, 0);
-				while(pindex.Height > nHeight)
+				while (pindex.Height > nHeight)
 					pindex = pindex.Previous;
-				if(vHave.Count > 10)
+				if (vHave.Count > 10)
 					nStep *= 2;
 			}
 
@@ -148,16 +204,19 @@ namespace NBitcoin
 		public override bool Equals(object obj)
 		{
 			ChainedBlock item = obj as ChainedBlock;
-			if(item == null)
+			if (item == null)
 				return false;
 			return phashBlock.Equals(item.phashBlock);
 		}
+
 		public static bool operator ==(ChainedBlock a, ChainedBlock b)
 		{
-			if(System.Object.ReferenceEquals(a, b))
+			if (System.Object.ReferenceEquals(a, b))
 				return true;
-			if(((object)a == null) || ((object)b == null))
+
+			if (((object)a == null) || ((object)b == null))
 				return false;
+
 			return a.phashBlock == b.phashBlock;
 		}
 
@@ -176,7 +235,7 @@ namespace NBitcoin
 		public IEnumerable<ChainedBlock> EnumerateToGenesis()
 		{
 			var current = this;
-			while(current != null)
+			while (current != null)
 			{
 				yield return current;
 				current = current.Previous;
@@ -190,21 +249,23 @@ namespace NBitcoin
 
 		public ChainedBlock FindAncestorOrSelf(int height)
 		{
-			if(height > Height)
+			if (height > Height)
 				throw new InvalidOperationException("Can only find blocks below or equals to current height");
-			if(height < 0)
+			if (height < 0)
 				throw new ArgumentOutOfRangeException("height");
+
 			ChainedBlock currentBlock = this;
-			while(height != currentBlock.Height)
+			while (height != currentBlock.Height)
 			{
 				currentBlock = currentBlock.Previous;
 			}
 			return currentBlock;
 		}
+
 		public ChainedBlock FindAncestorOrSelf(uint256 blockHash)
 		{
 			ChainedBlock currentBlock = this;
-			while(currentBlock != null && currentBlock.HashBlock != blockHash)
+			while (currentBlock != null && currentBlock.HashBlock != blockHash)
 			{
 				currentBlock = currentBlock.Previous;
 			}
@@ -213,93 +274,29 @@ namespace NBitcoin
 
 		public Target GetWorkRequired(Network network)
 		{
-			return GetWorkRequired(network.Consensus);
+			return this.GetWorkRequired(network.Consensus);
 		}
 
 		public Target GetNextWorkRequired(Network network)
 		{
-			return GetNextWorkRequired(network.Consensus);
+			return this.GetNextWorkRequired(network.Consensus);
 		}
+
 		public Target GetNextWorkRequired(Consensus consensus)
 		{
-			BlockHeader dummy = new BlockHeader();
-			dummy.HashPrevBlock = this.HashBlock;
-			dummy.BlockTime = DateTimeOffset.UtcNow;
-			return GetNextWorkRequired(dummy, consensus);
+			Block dummy = new Block();
+			dummy.Header.HashPrevBlock = this.HashBlock;
+			dummy.Header.BlockTime = DateTimeOffset.UtcNow;
+			return this.GetNextWorkRequired(dummy, consensus);
 		}
 
-		public Target GetNextWorkRequired(BlockHeader block, Network network)
-		{
-			return GetNextWorkRequired(block, network.Consensus);
-		}
-
-		public Target GetNextWorkRequired(BlockHeader block, Consensus consensus)
+		public Target GetNextWorkRequired(Block block, Consensus consensus)
 		{
 			return new ChainedBlock(block, block.GetHash(), this).GetWorkRequired(consensus);
 		}
 
-		public Target GetWorkRequired(Consensus consensus)
-		{
-			// Genesis block
-			if(Height == 0)
-				return consensus.PowLimit;
-			var nProofOfWorkLimit = consensus.PowLimit;
-			var pindexLast = this.Previous;
-			var height = Height;
-
-			if(pindexLast == null)
-				return nProofOfWorkLimit;
-
-			// Only change once per interval
-			if((height) % consensus.DifficultyAdjustmentInterval != 0)
-			{
-				if(consensus.PowAllowMinDifficultyBlocks)
-				{
-					// Special difficulty rule for testnet:
-					// If the new block's timestamp is more than 2* 10 minutes
-					// then allow mining of a min-difficulty block.
-					if(this.Header.BlockTime > pindexLast.Header.BlockTime + TimeSpan.FromTicks(consensus.PowTargetSpacing.Ticks * 2))
-						return nProofOfWorkLimit;
-					else
-					{
-						// Return the last non-special-min-difficulty-rules-block
-						ChainedBlock pindex = pindexLast;
-						while(pindex.Previous != null && (pindex.Height % consensus.DifficultyAdjustmentInterval) != 0 && pindex.Header.Bits == nProofOfWorkLimit)
-							pindex = pindex.Previous;
-						return pindex.Header.Bits;
-					}
-				}
-				return pindexLast.Header.Bits;
-			}
-
-			// Go back by what we want to be 14 days worth of blocks
-			var pastHeight = pindexLast.Height - (consensus.DifficultyAdjustmentInterval - 1);
-			ChainedBlock pindexFirst = this.EnumerateToGenesis().FirstOrDefault(o => o.Height == pastHeight);
-			assert(pindexFirst);
-
-			if(consensus.PowNoRetargeting)
-				return pindexLast.header.Bits;
-
-			// Limit adjustment step
-			var nActualTimespan = pindexLast.Header.BlockTime - pindexFirst.Header.BlockTime;
-			if(nActualTimespan < TimeSpan.FromTicks(consensus.PowTargetTimespan.Ticks / 4))
-				nActualTimespan = TimeSpan.FromTicks(consensus.PowTargetTimespan.Ticks / 4);
-			if(nActualTimespan > TimeSpan.FromTicks(consensus.PowTargetTimespan.Ticks * 4))
-				nActualTimespan = TimeSpan.FromTicks(consensus.PowTargetTimespan.Ticks * 4);
-
-			// Retarget
-			var bnNew = pindexLast.Header.Bits.ToBigInteger();
-			bnNew *= (ulong)nActualTimespan.TotalSeconds;
-			bnNew /= (ulong)consensus.PowTargetTimespan.TotalSeconds;
-			var newTarget = new Target(bnNew);
-			if(newTarget > nProofOfWorkLimit)
-				newTarget = nProofOfWorkLimit;
-
-			return newTarget;
-		}
-
-
 		const int nMedianTimeSpan = 11;
+
 		public DateTimeOffset GetMedianTimePast()
 		{
 			DateTimeOffset[] pmedian = new DateTimeOffset[nMedianTimeSpan];
@@ -307,8 +304,7 @@ namespace NBitcoin
 			int pend = nMedianTimeSpan;
 
 			ChainedBlock pindex = this;
-			for(int i = 0; i < nMedianTimeSpan && pindex != null; i++, pindex = pindex.Previous)
-				pmedian[--pbegin] = pindex.Header.BlockTime;
+			for (int i = 0; i < nMedianTimeSpan && pindex != null; i++, pindex = pindex.Previous) pmedian[--pbegin] = pindex.Header.BlockTime;
 
 			Array.Sort(pmedian);
 			return pmedian[pbegin + ((pend - pbegin) / 2)];
@@ -316,46 +312,195 @@ namespace NBitcoin
 
 		private static void assert(object obj)
 		{
-			if(obj == null)
-				throw new NotSupportedException("Can only calculate work of a full chain");
+			if (obj == null) throw new NotSupportedException("Can only calculate work of a full chain");
 		}
 
 		public bool Validate(Network network)
 		{
-			if(network == null)
+			if (network == null)
 				throw new ArgumentNullException("network");
-			if(Height != 0 && Previous == null)
+			if (Height != 0 && Previous == null)
 				return false;
 			var heightCorrect = Height == 0 || Height == Previous.Height + 1;
 			var genesisCorrect = Height != 0 || HashBlock == network.GetGenesis().GetHash();
 			var hashPrevCorrect = Height == 0 || Header.HashPrevBlock == Previous.HashBlock;
 			var hashCorrect = HashBlock == Header.GetHash();
-			var workCorrect = CheckProofOfWorkAndTarget(network);
+			var workCorrect = this.CheckPowPosAndTarget(network);
 			return heightCorrect && genesisCorrect && hashPrevCorrect && hashCorrect && workCorrect;
 		}
 
-		public bool CheckProofOfWorkAndTarget(Network network)
+		public bool CheckPowPosAndTarget(Network network)
 		{
-			return CheckProofOfWorkAndTarget(network.Consensus);
+			return this.CheckPowPosAndTarget(network.Consensus);
 		}
 
-		public bool CheckProofOfWorkAndTarget(Consensus consensus)
+		public bool CheckPowPosAndTarget(Consensus consensus)
 		{
-			return Height == 0 || (Header.CheckProofOfWork() && Header.Bits <= GetWorkRequired(consensus));
+			if (this.Height == 0)
+				return true;
+
+			if (this.IsProofOfWork() && !this.Header.CheckProofOfWork())
+				return false;
+
+			return this.Header.Bits == this.GetWorkRequired(consensus);
+		}
+
+		public Target GetWorkRequired(Consensus consensus)
+		{
+			return GetNextTargetRequired(this.Previous, consensus, this.IsProofOfStake());
 		}
 
 		public ChainedBlock GetAncestor(int height)
 		{
-			if(height > Height || height < 0)
+			if (height > Height || height < 0)
 				return null;
-			ChainedBlock current = this;
 
-			while(true)
+			ChainedBlock current = this;
+			while (true)
 			{
-				if(current.Height == height)
+				if (current.Height == height)
 					return current;
 				current = current.Previous;
 			}
+		}
+
+		// POS methods
+		// -------------------------------------
+
+		private static bool IsProtocolV1RetargetingFixed(int height)
+		{
+			return height > 0;
+		}
+
+		private static bool IsProtocolV2(int height)
+		{
+			return height > 0;
+		}
+
+		private static bool IsProtocolV3(int nTime)
+		{
+			return nTime > 1470467000;
+		}
+
+		private static System.Numerics.BigInteger GetProofOfStakeLimit(Consensus consensus, int height)
+		{
+			return IsProtocolV2(height) ? consensus.ProofOfStakeLimitV2 : consensus.ProofOfStakeLimit;
+		}
+
+		private static int GetTargetSpacing(int height)
+		{
+			return IsProtocolV2(height) ? 64 : 60;
+		}
+
+		// find last block index up to index
+		private static ChainedBlock GetLastBlockIndex(ChainedBlock index, bool proofOfStake)
+		{
+			if (index == null)
+				throw new ArgumentNullException(nameof(index));
+
+			while (index.pprev != null && (index.IsProofOfStake() != proofOfStake))
+				index = index.pprev;
+
+			return index;
+		}
+
+		public static Target GetNextTargetRequired(ChainedBlock indexLast, Consensus consensus, bool proofOfStake)
+		{
+			// Genesis block
+			if (indexLast == null)
+				return consensus.PowLimit;
+
+			// find the last two blocks that correspond to the mining algo 
+			// (i.e if this is a POS block we need to find the last two POS blocks)
+			var targetLimit = proofOfStake ? GetProofOfStakeLimit(consensus, indexLast.Height) : consensus.PowLimit.ToBigInteger();
+
+			// first block
+			var pindexPrev = GetLastBlockIndex(indexLast, proofOfStake);
+			if (pindexPrev.pprev == null)
+				return new Target(targetLimit);
+
+			// second block
+			var pindexPrevPrev = GetLastBlockIndex(pindexPrev.pprev, proofOfStake);
+			if (pindexPrevPrev == null)
+				return new Target(targetLimit);
+
+
+			int targetSpacing = GetTargetSpacing(indexLast.Height);
+			int actualSpacing = (int)(pindexPrev.header.Time - pindexPrevPrev.header.Time);
+			if (IsProtocolV1RetargetingFixed(indexLast.Height))
+			{
+				if (actualSpacing < 0) actualSpacing = targetSpacing;
+			}
+			if (IsProtocolV3((int)indexLast.header.Time))
+			{
+				if (actualSpacing > targetSpacing * 10) actualSpacing = targetSpacing * 10;
+			}
+
+			// target change every block
+			// retarget with exponential moving toward target spacing
+			var targetTimespan = 16 * 60; // 16 mins
+			var target = pindexPrev.Header.Bits.ToBigInteger();
+
+			int interval = targetTimespan / targetSpacing;
+			target *= ((interval - 1) * targetSpacing + actualSpacing + actualSpacing);
+			target /= ((interval + 1) * targetSpacing);
+
+			if (target <= 0 || target > targetLimit)
+				target = targetLimit;
+
+			return new Target(target);
+		}
+
+		private void EnsurePosHeader()
+		{
+			if (this.posHeader == null)
+				throw new MissingFieldException("PosHeader");
+		}
+
+		public bool IsProofOfWork()
+		{
+			this.EnsurePosHeader();
+			return !((this.posHeader.Flags & BlockFlag.BLOCK_PROOF_OF_STAKE) > 0);
+		}
+
+		public bool IsProofOfStake()
+		{
+			this.EnsurePosHeader();
+			return (this.posHeader.Flags & BlockFlag.BLOCK_PROOF_OF_STAKE) > 0;
+		}
+
+		public void SetProofOfStake()
+		{
+			this.EnsurePosHeader();
+			this.posHeader.Flags |= BlockFlag.BLOCK_PROOF_OF_STAKE;
+		}
+
+		public uint GetStakeEntropyBit()
+		{
+			this.EnsurePosHeader();
+			return (uint)(this.posHeader.Flags & BlockFlag.BLOCK_STAKE_ENTROPY) >> 1;
+		}
+
+		public bool SetStakeEntropyBit(uint nEntropyBit)
+		{
+			this.EnsurePosHeader();
+			if (nEntropyBit > 1)
+				return false;
+			this.posHeader.Flags |= (nEntropyBit != 0 ? BlockFlag.BLOCK_STAKE_ENTROPY : 0);
+			return true;
+		}
+
+		public bool GeneratedStakeModifier()
+		{
+			this.EnsurePosHeader();
+			return (this.posHeader.Flags & BlockFlag.BLOCK_STAKE_MODIFIER) > 0;
+		}
+
+		public void SetStakeModifier(uint modifier, bool fGeneratedStakeModifier)
+		{
+			this.EnsurePosHeader();
+			this.posHeader.StakeModifier = modifier;
+			if (fGeneratedStakeModifier) this.posHeader.Flags |= BlockFlag.BLOCK_STAKE_MODIFIER;
 		}
 	}
 }
