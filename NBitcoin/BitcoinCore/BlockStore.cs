@@ -53,7 +53,7 @@ namespace NBitcoin.BitcoinCore
 					{
 						toRemove.Add(block.Key);
 						ChainedBlock chainedBlock;
-						if(last.Header.GetHash() == block.Value.Header.HashPrevBlock)
+						if(last.HashBlock == block.Value.Header.HashPrevBlock)
 						{
 							chainedBlock = last;
 						}
