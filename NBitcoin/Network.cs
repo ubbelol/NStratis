@@ -437,8 +437,8 @@ namespace NBitcoin
 
 
 		protected uint magic;
-		byte[] vAlertPubKey;
-		PubKey _AlertPubKey;
+		protected byte[] vAlertPubKey;
+		protected PubKey _AlertPubKey;
 		public PubKey AlertPubKey
 		{
 			get
