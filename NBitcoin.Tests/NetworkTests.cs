@@ -40,9 +40,9 @@ namespace NBitcoin.Tests
 	}
 
 	/// <summary>
-	/// Some tests are Blockchain agnostice but have results, 
-	/// that depend on the Bitcoin blockchain network parameters.
-	/// This class is for such tests.
+	/// Some tests are Blockchain agnostice but have results that
+	/// depend on the Bitcoin blockchain network parameters.
+	/// This class is for such test cases.
 	/// </summary>
 	public class BitcoinNetwork : Network
 	{

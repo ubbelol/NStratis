@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Net;
 using System.Net.Http;
 using System.Text;
 using System.Threading.Tasks;
@@ -18,26 +19,27 @@ namespace NBitcoin.Tests
 		[Trait("UnitTest", "UnitTest")]
 		public static void CanCalculatePowCorrectly()
 		{
-			var store = new BlockStore(@"C:\StratisData", Network.Main);
+			EnsureDownloaded(@"download\blocks\blk0001.dat", "https://n5uqoa.bn1302.livefilestore.com/y3mPnoFPfm1JaRLEnsmhCXceQD9E_udAEL6scZ9NaI4AApzCMOyZlRtkKAGxGqmL-0OkjdadX_odPnn70izPPrDQd9lAh20q0_sbASCyn83U_it_niIR5IC7lKMFeLVP5rk9NPfgYcubzkDly3C9cJzkA/blk0001.dat?download&psid=1");
+			var store = new BlockStore(@"download\blocks", Network.Main);
 			ConcurrentChain chain = store.GetChain();
-			//EnsureDownloaded("main.headers.dat", "https://bytyng.bn1302.livefilestore.com/y3miHC-eZsNz89GuLViA3-8dTT5BmYBgq6H1VdmtDAhv0XQpaWoBh85lPDEswbgP_kqLXKLJSIGrO1SpyzFszbmXqL5EhcwcYKf6WM9St9Z_wOIx38sC4NfEQKjI8QzwNdr5sNnyI_OxVHWiee14-H5rw/main.headers.dat?download&psid=1");
-			//chain.Load(File.ReadAllBytes("main.headers.dat"));
-			foreach(var block in chain.EnumerateAfter(chain.Genesis))
+
+			foreach (var block in chain.EnumerateAfter(chain.Genesis))
 			{
-				var thisWork = block.GetWorkRequired(Network.Main);
-				var thisWork2 = block.Previous.GetNextWorkRequired(Network.Main);
-				Assert.Equal(thisWork, thisWork2);
 				Assert.True(block.CheckPowPosAndTarget(Network.Main));
 			}
 		}
 
 		private static void EnsureDownloaded(string file, string url)
 		{
+			// todo: move this to a common area
 			if(File.Exists(file))
 				return;
-			HttpClient client = new HttpClient();
-			var data = client.GetByteArrayAsync(url).GetAwaiter().GetResult();
-			File.WriteAllBytes(file, data);
+
+			if (!Directory.Exists(Path.GetDirectoryName(file)))
+				Directory.CreateDirectory(Path.GetDirectoryName(file));
+			
+			WebClient client = new WebClient();
+			client.DownloadFile(url, file);
 		}
 	}
 }

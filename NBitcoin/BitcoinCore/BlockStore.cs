@@ -45,20 +45,28 @@ namespace NBitcoin.BitcoinCore
 			List<uint256> toRemove = new List<uint256>();
 			while (blocks.Count != 0)
 			{
+				// to optimize keep a track of the last block
+				ChainedBlock last = chain.GetBlock(0);
 				foreach (var block in blocks)
 				{
 					if (inChain.Contains(block.Value.Header.HashPrevBlock))
 					{
 						toRemove.Add(block.Key);
 						ChainedBlock chainedBlock;
-
-						if (!chainedBlocks.TryGetValue(block.Value.Header.HashPrevBlock, out chainedBlock))
-							break;
-
+						if(last.Header.GetHash() == block.Value.Header.HashPrevBlock)
+						{
+							chainedBlock = last;
+						}
+						else
+						{
+							if (!chainedBlocks.TryGetValue(block.Value.Header.HashPrevBlock, out chainedBlock))
+								break;
+						}
 						var chainedHeader = new ChainedBlock(block.Value, block.Value.GetHash(), chainedBlock);
 						chain.SetTip(chainedHeader);
 						chainedBlocks.TryAdd(chainedHeader.HashBlock, chainedHeader);
 						inChain.Add(block.Key);
+						last = chainedHeader;
 					}
 				}
 				foreach (var item in toRemove)

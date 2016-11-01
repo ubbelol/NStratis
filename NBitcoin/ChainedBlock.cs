@@ -277,24 +277,6 @@ namespace NBitcoin
 			return this.GetWorkRequired(network.Consensus);
 		}
 
-		public Target GetNextWorkRequired(Network network)
-		{
-			return this.GetNextWorkRequired(network.Consensus);
-		}
-
-		public Target GetNextWorkRequired(Consensus consensus)
-		{
-			Block dummy = new Block();
-			dummy.Header.HashPrevBlock = this.HashBlock;
-			dummy.Header.BlockTime = DateTimeOffset.UtcNow;
-			return this.GetNextWorkRequired(dummy, consensus);
-		}
-
-		public Target GetNextWorkRequired(Block block, Consensus consensus)
-		{
-			return new ChainedBlock(block, block.GetHash(), this).GetWorkRequired(consensus);
-		}
-
 		const int nMedianTimeSpan = 11;
 
 		public DateTimeOffset GetMedianTimePast()
