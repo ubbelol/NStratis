@@ -6,31 +6,11 @@ using System.Threading.Tasks;
 
 namespace NBitcoin
 {
+	using System.Runtime.CompilerServices;
+
 	using NBitcoin.BouncyCastle.Math;
 
-	[Flags]
-	public enum BlockFlag //block index flags
-
-	{
-		BLOCK_PROOF_OF_STAKE = (1 << 0), // is proof-of-stake block
-		BLOCK_STAKE_ENTROPY  = (1 << 1), // entropy bit for stake modifier
-		BLOCK_STAKE_MODIFIER = (1 << 2), // regenerated stake modifier
-	};
-
-	public class PosHeader
-	{
-		public int Mint;
-
-		public OutPoint PrevoutStake;
-
-		public uint StakeTime;
-
-		public uint StakeModifier; // hash modifier for proof-of-stake
-
-		public uint256 StakeModifierV2;
-
-		public BlockFlag Flags { get; set; }
-	}
+	
 
 	/// <summary>
 	/// A BlockHeader chained with all its ancestors
@@ -82,17 +62,6 @@ namespace NBitcoin
 			}
 		}
 
-		PosHeader posHeader;
-
-		public PosHeader PosHeader
-		{
-			get
-			{
-				return posHeader;
-			}
-		}
-
-
 		System.Numerics.BigInteger _ChainWork;
 
 		public uint256 ChainWork
@@ -106,7 +75,7 @@ namespace NBitcoin
 		public ChainedBlock(BlockHeader header, uint256 headerHash, ChainedBlock previous)
 		{
 			if (header == null)
-				throw new ArgumentNullException("header");
+				throw new ArgumentNullException(nameof(header));
 
 			if (previous != null)
 			{
@@ -129,19 +98,6 @@ namespace NBitcoin
 			}
 
 			CalculateChainWork();
-		}
-
-		public ChainedBlock(Block block, uint256 headerHash, ChainedBlock previous)
-			: this(block.Header, headerHash, previous)
-		{
-			this.posHeader = new PosHeader();
-
-			if (block.IsProofOfStake())
-			{
-				this.SetProofOfStake();
-				this.posHeader.PrevoutStake = block.Transactions[1].Inputs[0].PrevOut;
-				this.posHeader.StakeTime = block.Transactions[1].Time;
-			}
 		}
 
 		private void CalculateChainWork()
@@ -294,7 +250,8 @@ namespace NBitcoin
 
 		private static void assert(object obj)
 		{
-			if (obj == null) throw new NotSupportedException("Can only calculate work of a full chain");
+			if (obj == null)
+				throw new NotSupportedException("Can only calculate work of a full chain");
 		}
 
 		public bool Validate(Network network)
@@ -321,7 +278,7 @@ namespace NBitcoin
 			if (this.Height == 0)
 				return true;
 
-			if (this.IsProofOfWork() && !this.Header.CheckProofOfWork())
+			if (this.Header.PosParameters.IsProofOfWork() && !this.Header.CheckProofOfWork())
 				return false;
 
 			return this.Header.Bits == this.GetWorkRequired(consensus);
@@ -329,7 +286,8 @@ namespace NBitcoin
 
 		public Target GetWorkRequired(Consensus consensus)
 		{
-			return GetNextTargetRequired(this.Previous, consensus, this.IsProofOfStake());
+			this.EnsurePosHeader();
+			return GetNextTargetRequired(this.Previous, consensus, this.Header.PosParameters.IsProofOfStake());
 		}
 
 		public ChainedBlock GetAncestor(int height)
@@ -380,7 +338,7 @@ namespace NBitcoin
 			if (index == null)
 				throw new ArgumentNullException(nameof(index));
 
-			while (index.pprev != null && (index.IsProofOfStake() != proofOfStake))
+			while (index.pprev != null && (index.header.PosParameters.IsProofOfStake() != proofOfStake))
 				index = index.pprev;
 
 			return index;
@@ -435,54 +393,8 @@ namespace NBitcoin
 
 		private void EnsurePosHeader()
 		{
-			if (this.posHeader == null)
-				throw new MissingFieldException("PosHeader");
-		}
-
-		public bool IsProofOfWork()
-		{
-			this.EnsurePosHeader();
-			return !((this.posHeader.Flags & BlockFlag.BLOCK_PROOF_OF_STAKE) > 0);
-		}
-
-		public bool IsProofOfStake()
-		{
-			this.EnsurePosHeader();
-			return (this.posHeader.Flags & BlockFlag.BLOCK_PROOF_OF_STAKE) > 0;
-		}
-
-		public void SetProofOfStake()
-		{
-			this.EnsurePosHeader();
-			this.posHeader.Flags |= BlockFlag.BLOCK_PROOF_OF_STAKE;
-		}
-
-		public uint GetStakeEntropyBit()
-		{
-			this.EnsurePosHeader();
-			return (uint)(this.posHeader.Flags & BlockFlag.BLOCK_STAKE_ENTROPY) >> 1;
-		}
-
-		public bool SetStakeEntropyBit(uint nEntropyBit)
-		{
-			this.EnsurePosHeader();
-			if (nEntropyBit > 1)
-				return false;
-			this.posHeader.Flags |= (nEntropyBit != 0 ? BlockFlag.BLOCK_STAKE_ENTROPY : 0);
-			return true;
-		}
-
-		public bool GeneratedStakeModifier()
-		{
-			this.EnsurePosHeader();
-			return (this.posHeader.Flags & BlockFlag.BLOCK_STAKE_MODIFIER) > 0;
-		}
-
-		public void SetStakeModifier(uint modifier, bool fGeneratedStakeModifier)
-		{
-			this.EnsurePosHeader();
-			this.posHeader.StakeModifier = modifier;
-			if (fGeneratedStakeModifier) this.posHeader.Flags |= BlockFlag.BLOCK_STAKE_MODIFIER;
+			if (this.Header.PosParameters == null)
+				throw new MissingFieldException("PosParameters");
 		}
 	}
 }

@@ -62,7 +62,7 @@ namespace NBitcoin.BitcoinCore
 							if (!chainedBlocks.TryGetValue(block.Value.Header.HashPrevBlock, out chainedBlock))
 								break;
 						}
-						var chainedHeader = new ChainedBlock(block.Value, block.Value.GetHash(), chainedBlock);
+						var chainedHeader = new ChainedBlock(block.Value.Header, block.Value.GetHash(), chainedBlock);
 						chain.SetTip(chainedHeader);
 						chainedBlocks.TryAdd(chainedHeader.HashBlock, chainedHeader);
 						inChain.Add(block.Key);
