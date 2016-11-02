@@ -114,10 +114,10 @@
     <None Include="data\base58_keys_valid.json">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
-    <None Include="data\blocks\blk00000.dat">
+    <None Include="data\blocks\blk0001.dat">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
-    <None Include="data\blocks\blk00001.dat">
+    <None Include="data\blocks\blk0002.dat">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
     <None Include="data\blocks\Block1.json">
