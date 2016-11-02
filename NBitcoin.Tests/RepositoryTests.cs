@@ -92,7 +92,7 @@ namespace NBitcoin.Tests
 		[Trait("UnitTest", "UnitTest")]
 		public void CanEnumerateBlockInAFileRange()
 		{
-			var store = new BlockStore(@"data\blocks", Network.Main);
+			var store = new BlockStore(TestDataLocations.BlockFolderLocation, Network.Main);
 			var result = store.Enumerate(new DiskBlockPosRange(new DiskBlockPos(0, 0), new DiskBlockPos(1, 0))).ToList();
 			Assert.Equal(300, result.Count);
 		}
@@ -109,9 +109,9 @@ namespace NBitcoin.Tests
 		[Trait("UnitTest", "UnitTest")]
 		public void CanBuildChainFromBlocks()
 		{
-			var store = new BlockStore(@"data\blocks", Network.Main);
+			var store = new BlockStore(TestDataLocations.BlockFolderLocation, Network.Main);
 			var chain = store.GetChain();
-			Assert.True(chain.Height == 599);
+			Assert.True(chain.Height > 599);
 
 		}
 
@@ -472,16 +472,14 @@ namespace NBitcoin.Tests
                 var str = $"hash={b.GetHash()} ver={b.Header.Version} size={size} nonc={b.Header.Nonce} bits={b.Header.Bits} prv={b.Header.HashPrevBlock} mrk={b.Header.HashMerkleRoot}";
                 fileInserts.Add(str);
             }
-            var pathFile = @"C:\StratisData\compare-blocks.txt";
+            var pathFile = $@"{TestDataLocations.BlockFolderLocation}\compare-blocks.txt";
             File.WriteAllLines(pathFile, fileInserts);
         }
 
         private IEnumerable<string> ManuallyEnumerateTheBlockchainFile()
         {
             // read all bytes form the first block file
-            // to get a copy of the blockchain fiel without downloading follow this link
-            // https://1drv.ms/f/s!AE-fao7cBVQ-aQ
-            var byts = File.ReadAllBytes(@"C:\StratisData\blk0001.dat");
+            var byts = File.ReadAllBytes(TestDataLocations.Block0001Location);
             // the magic byte separator of blocks
             var m = new byte[4] { 0x70, 0x35, 0x22, 0x05 };
             // first bytes must be magic
@@ -553,8 +551,8 @@ namespace NBitcoin.Tests
         public void EnumerateStratisBlockcahinAndValidateAllBlocks()
         {
             var listAll = new Dictionary<string, StoredBlock>();
-            var store = new BlockStore(@"C:\StratisData", Network.Main);
-            foreach (var block in store.EnumerateFolder())
+			var store = new BlockStore(TestDataLocations.BlockFolderLocation, Network.Main);
+			foreach (var block in store.EnumerateFolder())
             {
                 var hash = block.Item.GetHash();
                 listAll.Add(hash.ToString(), block);
@@ -581,7 +579,7 @@ namespace NBitcoin.Tests
         [Trait("UnitTest", "UnitTest")]
         public void EnumerateStratisBlockcahinCheckTipBlock()
         {
-            var store = new BlockStore(@"C:\StratisData", Network.Main);
+            var store = new BlockStore(TestDataLocations.BlockFolderLocation, Network.Main);
 
             // use the synchronize chain method to load all blocks and look for the tip (currently block 100k)
             var block100K = uint256.Parse("af380a53467b70bc5d1ee61441586398a0a5907bb4fad7855442575483effa54");
