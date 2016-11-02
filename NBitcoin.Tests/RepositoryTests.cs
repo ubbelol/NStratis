@@ -203,13 +203,10 @@ namespace NBitcoin.Tests
 			Assert.Equal(0, reIndexed);
 		}
 
-
 		[Fact]
 		[Trait("UnitTest", "UnitTest")]
 		public static void CanParseRev()
 		{
-			// todo: create an undo file
-
 			BlockUndoStore src = new BlockUndoStore(@"data\blocks", Network.Main);
 			BlockUndoStore dest = CreateBlockUndoStore();
 			int count = 0;
@@ -221,7 +218,7 @@ namespace NBitcoin.Tests
 				dest.Append(un.Item);
 				count++;
 			}
-			Assert.Equal(40, count);
+			Assert.Equal(8, count);
 
 			count = 0;
 			foreach(var un in dest.EnumerateFolder())
@@ -231,7 +228,7 @@ namespace NBitcoin.Tests
 				Assert.Equal(expectedSize, actualSize);
 				count++;
 			}
-			Assert.Equal(40, count);
+			Assert.Equal(8, count);
 		}
 		
 		[Fact]
