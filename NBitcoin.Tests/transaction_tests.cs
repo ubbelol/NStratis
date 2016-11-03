@@ -2019,65 +2019,6 @@ namespace NBitcoin.Tests
 		}
 
 		[Fact]
-		public void Play2()
-		{
-			BitcoinSecret secret = new BitcoinSecret("L5AQtV2HDm4xGsseLokK2VAT2EtYKcTm3c7HwqnJBFt9LdaQULsM");
-			var all = GetCombinaisons().ToArray();
-			while(true)
-			{
-				Utils.Shuffle(all);
-				if(((uint)all[0].SigHash & 0x1f) != (uint)SigHash.All)
-					break;
-			}
-			int i = 0;
-			Transaction tx = new Transaction();
-			List<ICoin> coins = new List<ICoin>();
-			foreach(var combinaison in all)
-			{
-				var scriptPubKey = combinaison.Segwit ? secret.PubKey.WitHash.ScriptPubKey : secret.PubKey.Hash.ScriptPubKey;
-				ICoin coin = new Coin(
-								new uint256("0000000000000000000000000000000000000000000000000000000000000100"), (uint)i,
-								Money.Satoshis(1000 + i), scriptPubKey);
-				tx.Inputs.Add(new TxIn(coin.Outpoint));
-				tx.AddOutput(new TxOut(Money.Satoshis(1000 + i), new Script(OpcodeType.OP_TRUE)));
-				coins.Add(coin);
-				i++;
-			}
-
-			TransactionBuilder builder2 = new TransactionBuilder();
-			builder2.SetTransactionPolicy(new StandardTransactionPolicy()
-			{
-				CheckFee = false,
-				MinRelayTxFee = null,
-				CheckScriptPubKey = false
-			});
-			builder2.AddCoins(coins.ToArray());
-			builder2.AddKeys(secret);
-			builder2.SignTransactionInPlace(tx);
-			var verified = builder2.Verify(tx);
-
-			StringBuilder output = new StringBuilder();
-			output.Append("[\"Transaction mixing all SigHash and segwit and non segwit inputs");
-
-			output.Append("\"],");
-			output.AppendLine();
-			WriteTest(output, coins.OfType<Coin>().ToList(), tx);
-
-
-			//var scriptPubKey = new Script(OpcodeType.OP_16, Op.GetPushOp(new byte[] { 0, 1 }));
-			//ICoin coin1 = new Coin(
-			//					new uint256("0000000000000000000000000000000000000000000000000000000000000100"), 0,
-			//					Money.Satoshis(1000), scriptPubKey);
-			//Transaction tx = new Transaction();
-			//tx.Inputs.Add(new TxIn(coin1.Outpoint)
-			//{
-			//	ScriptSig = new Script(OpcodeType.OP_1)
-			//});
-			//tx.Outputs.Add(new TxOut(Money.Zero, new Script(OpcodeType.OP_TRUE)));
-			//var verified = tx.Inputs.AsIndexedInputs().First().VerifyScript(coin1, ScriptVerify.P2SH | ScriptVerify.Witness);
-		}
-
-		[Fact]
 		[Trait("UnitTest", "UnitTest")]
 		public void CanCacheHashes()
 		{
@@ -2165,7 +2106,7 @@ namespace NBitcoin.Tests
 		[Trait("UnitTest", "UnitTest")]
 		public void TestSigHashes()
 		{
-			BitcoinSecret secret = new BitcoinSecret("L5AQtV2HDm4xGsseLokK2VAT2EtYKcTm3c7HwqnJBFt9LdaQULsM");
+			BitcoinSecret secret = new BitcoinSecret("L5AQtV2HDm4xGsseLokK2VAT2EtYKcTm3c7HwqnJBFt9LdaQULsM", BitcoinNetwork.Main);
 			var key = secret.PrivateKey;
 			StringBuilder output = new StringBuilder();
 			foreach(var segwit in new[] { false, true })
@@ -2724,8 +2665,14 @@ namespace NBitcoin.Tests
 
 		void CreateCreditAndSpend(CKeyStore keystore, Script outscript, ref Transaction output, ref Transaction input, bool success = true)
 		{
+			CreateCreditAndSpend(keystore, outscript, ref output, ref input, DateTime.Now, success);
+		}
+
+		void CreateCreditAndSpend(CKeyStore keystore, Script outscript, ref Transaction output, ref Transaction input, DateTime posTimeStamp, bool success = true)
+		{
 			Transaction outputm = new Transaction();
 			outputm.Version = 1;
+			outputm.Time = Utils.DateTimeToUnixTime(posTimeStamp);
 			outputm.Inputs.Add(new TxIn());
 			outputm.Inputs[0].PrevOut = new OutPoint();
 			outputm.Inputs[0].ScriptSig = Script.Empty;
@@ -2744,6 +2691,7 @@ namespace NBitcoin.Tests
 
 			Transaction inputm = new Transaction();
 			inputm.Version = 1;
+			outputm.Time = Utils.DateTimeToUnixTime(posTimeStamp);
 			inputm.Inputs.Add(new TxIn());
 			inputm.Inputs[0].PrevOut.Hash = output.GetHash();
 			inputm.Inputs[0].PrevOut.N = 0;
@@ -2890,6 +2838,7 @@ namespace NBitcoin.Tests
 			Transaction input1, input2;
 			input1 = new Transaction();
 			input2 = new Transaction();
+			var commonTimestamp = DateTime.Now;
 
 			// Normal pay-to-compressed-pubkey.
 			CreateCreditAndSpend(keystore, scriptPubkey1, ref output1, ref input1);
@@ -2992,19 +2941,19 @@ namespace NBitcoin.Tests
 			CheckWithFlag(output1, input2, ScriptVerify.Standard, false);
 
 			// Normal 2-of-2 multisig
-			CreateCreditAndSpend(keystore, scriptMulti, ref output1, ref input1, false);
+			CreateCreditAndSpend(keystore, scriptMulti, ref output1, ref input1, commonTimestamp, false);
 			CheckWithFlag(output1, input1, 0, false);
-			CreateCreditAndSpend(keystore2, scriptMulti, ref output2, ref input2, false);
+			CreateCreditAndSpend(keystore2, scriptMulti, ref output2, ref input2, commonTimestamp, false);
 			CheckWithFlag(output2, input2, 0, false);
 			Assert.True(output1.ToBytes().SequenceEqual(output2.ToBytes()));
 			CombineSignatures(keystore, output1, ref input1, input2);
 			CheckWithFlag(output1, input1, ScriptVerify.Standard, true);
 
 			// P2SH 2-of-2 multisig
-			CreateCreditAndSpend(keystore, scriptMulti.Hash.ScriptPubKey, ref output1, ref input1, false);
+			CreateCreditAndSpend(keystore, scriptMulti.Hash.ScriptPubKey, ref output1, ref input1, commonTimestamp, false);
 			CheckWithFlag(output1, input1, 0, true);
 			CheckWithFlag(output1, input1, ScriptVerify.P2SH, false);
-			CreateCreditAndSpend(keystore2, scriptMulti.Hash.ScriptPubKey, ref output2, ref input2, false);
+			CreateCreditAndSpend(keystore2, scriptMulti.Hash.ScriptPubKey, ref output2, ref input2, commonTimestamp, false);
 			CheckWithFlag(output2, input2, 0, true);
 			CheckWithFlag(output2, input2, ScriptVerify.P2SH, false);
 			Assert.True(output1.ToBytes().SequenceEqual(output2.ToBytes()));
@@ -3013,10 +2962,10 @@ namespace NBitcoin.Tests
 			CheckWithFlag(output1, input1, ScriptVerify.Standard, true);
 
 			// Witness 2-of-2 multisig
-			CreateCreditAndSpend(keystore, GetScriptForWitness(scriptMulti), ref output1, ref input1, false);
+			CreateCreditAndSpend(keystore, GetScriptForWitness(scriptMulti), ref output1, ref input1, commonTimestamp, false);
 			CheckWithFlag(output1, input1, 0, true);
 			CheckWithFlag(output1, input1, ScriptVerify.P2SH | ScriptVerify.Witness, false);
-			CreateCreditAndSpend(keystore2, GetScriptForWitness(scriptMulti), ref output2, ref input2, false);
+			CreateCreditAndSpend(keystore2, GetScriptForWitness(scriptMulti), ref output2, ref input2, commonTimestamp, false);
 			CheckWithFlag(output2, input2, 0, true);
 			CheckWithFlag(output2, input2, ScriptVerify.P2SH | ScriptVerify.Witness, false);
 			Assert.True(output1.ToBytes().SequenceEqual(output2.ToBytes()));
@@ -3025,10 +2974,10 @@ namespace NBitcoin.Tests
 			CheckWithFlag(output1, input1, ScriptVerify.Standard, true);
 
 			// P2SH witness 2-of-2 multisig
-			CreateCreditAndSpend(keystore, GetScriptForWitness(scriptMulti).Hash.ScriptPubKey, ref output1, ref input1, false);
+			CreateCreditAndSpend(keystore, GetScriptForWitness(scriptMulti).Hash.ScriptPubKey, ref output1, ref input1, commonTimestamp, false);
 			CheckWithFlag(output1, input1, ScriptVerify.P2SH, true);
 			CheckWithFlag(output1, input1, ScriptVerify.P2SH | ScriptVerify.Witness, false);
-			CreateCreditAndSpend(keystore2, GetScriptForWitness(scriptMulti).Hash.ScriptPubKey, ref output2, ref input2, false);
+			CreateCreditAndSpend(keystore2, GetScriptForWitness(scriptMulti).Hash.ScriptPubKey, ref output2, ref input2, commonTimestamp, false);
 			CheckWithFlag(output2, input2, ScriptVerify.P2SH, true);
 			CheckWithFlag(output2, input2, ScriptVerify.P2SH | ScriptVerify.Witness, false);
 			Assert.True(output1.ToBytes().SequenceEqual(output2.ToBytes()));
