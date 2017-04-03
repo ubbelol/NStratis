@@ -5,5 +5,5 @@
 - ### Hash functions for the X13 POW minining algorithem
 
 ### NStratis is targetd to the Stratis blockchain 
-#### It's the core component of the stratis [fullnode](https://github.com/stratisproject/StratisBitcoinFullNode) freamwork, a port of the bitcoin blockcahin in C#
+#### It's the core component of the stratis [fullnode](https://github.com/stratisproject/StratisBitcoinFullNode) freamwork, a port of the bitcoin blockchain in C#
 
